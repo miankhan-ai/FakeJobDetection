@@ -2,9 +2,14 @@ from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
+import logging
 from services.analyzer import analyzer
 from services.reporter import reporter
 from services.email_service import email_service
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="The Sentinel API", description="AI Job Fraud Detection & Reporting System")
 
@@ -16,6 +21,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Log startup
+@app.on_event("startup")
+async def startup_event():
+    logger.info("🚀 Sentinel API starting up...")
+    logger.info(f"✓ CORS enabled for all origins")
+    logger.info(f"✓ Email service initialized")
 
 class JobPosting(BaseModel):
     title: str
@@ -54,6 +66,9 @@ async def analyze_job(posting: JobPosting):
 
 @app.post("/api/report-incident")
 async def generate_fraud_report(request: ReportRequest):
+    logger.info(f"📧 Fraud report request received for: {request.company} - {request.job_title}")
+    logger.info(f"   Risk Score: {request.risk_score}")
+    
     # Send email to the fraud detection team
     email_result = email_service.send_fraud_report(
         recipient_email="miankhan.dev@gmail.com",
@@ -63,13 +78,17 @@ async def generate_fraud_report(request: ReportRequest):
         red_flags=request.red_flags
     )
     
+    logger.info(f"📤 Email service response: {email_result['status']}")
+    
     if email_result["status"] == "success":
+        logger.info(f"✓ Email sent successfully to {email_result['recipient']}")
         return {
             "status": "success",
             "message": "Fraud report sent successfully",
             "email_sent_to": email_result["recipient"]
         }
     else:
+        logger.error(f"✗ Email failed: {email_result['message']}")
         raise HTTPException(
             status_code=500,
             detail=f"Failed to send report: {email_result['message']}"
