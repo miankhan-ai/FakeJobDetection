@@ -70,7 +70,7 @@ async def generate_fraud_report(request: ReportRequest):
         logger.info(f"📧 Fraud report request received for: {request.company} - {request.job_title}")
         logger.info(f"   Risk Score: {request.risk_score}")
         logger.info(f"   Recipient: miankhan.dev@gmail.com")
-        
+
         # Send email to the fraud detection team
         logger.info("🔄 Calling email service...")
         email_result = email_service.send_fraud_report(
@@ -80,9 +80,9 @@ async def generate_fraud_report(request: ReportRequest):
             risk_score=request.risk_score,
             red_flags=request.red_flags
         )
-        
+
         logger.info(f"📤 Email service response: {email_result['status']}")
-        
+
         if email_result["status"] == "success":
             logger.info(f"✓ Email sent successfully to {email_result['recipient']}")
             return {
@@ -92,15 +92,22 @@ async def generate_fraud_report(request: ReportRequest):
             }
         else:
             logger.error(f"✗ Email failed: {email_result['message']}")
+            # Return error_type and message for better debugging
             raise HTTPException(
                 status_code=500,
-                detail=f"Failed to send report: {email_result['message']}"
+                detail={
+                    "error_type": email_result.get("error_type", "unknown_error"),
+                    "message": email_result.get("message", "Unknown error")
+                }
             )
     except Exception as e:
         logger.error(f"✗ Unexpected error in report endpoint: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail=f"Internal server error: {str(e)}"
+            detail={
+                "error_type": "exception",
+                "message": str(e)
+            }
         )
 
 @app.get("/api/global-trends")
