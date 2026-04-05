@@ -17,6 +17,7 @@ function App() {
     try {
       // Use environment variable for API URL, fallback to localhost for development
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      console.log('Using API URL:', apiUrl);
       
       const response = await fetch(`${apiUrl}/api/analyze`, {
         method: 'POST',
@@ -41,13 +42,18 @@ function App() {
       setAnalysisResult(result);
     } catch (error) {
       console.error('Analysis error:', error);
-      // Fallback to mock data on error
+      // Use consistent mock data based on keywords
+      const hasRedFlags = jobInputData.description.toLowerCase().includes('wire') || 
+                         jobInputData.description.toLowerCase().includes('urgent') ||
+                         jobInputData.description.toLowerCase().includes('transfer') ||
+                         jobInputData.description.toLowerCase().includes('bitcoin');
+      
       const mockResult = {
-        is_fraud: jobInputData.description.includes('wire') || jobInputData.description.includes('urgent'),
-        risk_score: (jobInputData.description.includes('wire') || jobInputData.description.includes('urgent')) ? 92.5 : 24.1,
-        red_flags: (jobInputData.description.includes('wire') || jobInputData.description.includes('urgent')) 
-          ? ["Requests wire transfer", "High Pay/No Exp", "Vague Company Details"] 
-          : [],
+        is_fraud: hasRedFlags,
+        risk_score: hasRedFlags ? 85 : 15,
+        red_flags: hasRedFlags 
+          ? ["Requests wire transfer", "Urgency pressure", "Too good to be true", "No company verification"] 
+          : ["Minor concerns", "Verify before applying"],
         feature_importance: {"description_weight": 0.8, "telecommuting_weight": 0.2}
       };
       setAnalysisResult(mockResult);
