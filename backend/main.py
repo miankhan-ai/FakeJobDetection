@@ -66,32 +66,41 @@ async def analyze_job(posting: JobPosting):
 
 @app.post("/api/report-incident")
 async def generate_fraud_report(request: ReportRequest):
-    logger.info(f"📧 Fraud report request received for: {request.company} - {request.job_title}")
-    logger.info(f"   Risk Score: {request.risk_score}")
-    
-    # Send email to the fraud detection team
-    email_result = email_service.send_fraud_report(
-        recipient_email="miankhan.dev@gmail.com",
-        job_title=request.job_title,
-        company=request.company,
-        risk_score=request.risk_score,
-        red_flags=request.red_flags
-    )
-    
-    logger.info(f"📤 Email service response: {email_result['status']}")
-    
-    if email_result["status"] == "success":
-        logger.info(f"✓ Email sent successfully to {email_result['recipient']}")
-        return {
-            "status": "success",
-            "message": "Fraud report sent successfully",
-            "email_sent_to": email_result["recipient"]
-        }
-    else:
-        logger.error(f"✗ Email failed: {email_result['message']}")
+    try:
+        logger.info(f"📧 Fraud report request received for: {request.company} - {request.job_title}")
+        logger.info(f"   Risk Score: {request.risk_score}")
+        logger.info(f"   Recipient: miankhan.dev@gmail.com")
+        
+        # Send email to the fraud detection team
+        logger.info("🔄 Calling email service...")
+        email_result = email_service.send_fraud_report(
+            recipient_email="miankhan.dev@gmail.com",
+            job_title=request.job_title,
+            company=request.company,
+            risk_score=request.risk_score,
+            red_flags=request.red_flags
+        )
+        
+        logger.info(f"📤 Email service response: {email_result['status']}")
+        
+        if email_result["status"] == "success":
+            logger.info(f"✓ Email sent successfully to {email_result['recipient']}")
+            return {
+                "status": "success",
+                "message": "Fraud report sent successfully",
+                "email_sent_to": email_result["recipient"]
+            }
+        else:
+            logger.error(f"✗ Email failed: {email_result['message']}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to send report: {email_result['message']}"
+            )
+    except Exception as e:
+        logger.error(f"✗ Unexpected error in report endpoint: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to send report: {email_result['message']}"
+            detail=f"Internal server error: {str(e)}"
         )
 
 @app.get("/api/global-trends")

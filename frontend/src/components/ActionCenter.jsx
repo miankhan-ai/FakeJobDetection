@@ -21,6 +21,13 @@ export default function ActionCenter({ result, jobPosting }) {
     try {
       // Use environment variable for API URL, fallback to localhost for development
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      console.log('🔗 Using API URL:', apiUrl);
+      console.log('📧 Sending report to:', apiUrl + '/api/report-incident');
+      
+      // Create abort controller for 30 second timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+      
       const response = await fetch(`${apiUrl}/api/report-incident`, {
         method: 'POST',
         headers: {
@@ -32,28 +39,41 @@ export default function ActionCenter({ result, jobPosting }) {
           risk_score: result.risk_score,
           red_flags: result.red_flags,
           target_platform: 'email'
-        })
+        }),
+        signal: controller.signal
       });
 
+      clearTimeout(timeoutId);
+      console.log('✓ Response received:', response.status);
       const data = await response.json();
       
       if (response.ok) {
+        console.log('✓ Email sent successfully!');
         setReportStatus({
           type: 'success',
           message: '✓ Fraud report sent to miankhan.dev@gmail.com'
         });
         setTimeout(() => setReportStatus(null), 5000);
       } else {
+        console.error('✗ Server error:', data);
         setReportStatus({
           type: 'error',
           message: `Error: ${data.detail || 'Failed to send report'}`
         });
       }
     } catch (error) {
-      setReportStatus({
-        type: 'error',
-        message: `Network error: ${error.message}`
-      });
+      console.error('✗ Network/CORS error:', error);
+      if (error.name === 'AbortError') {
+        setReportStatus({
+          type: 'error',
+          message: 'Request timed out. HF Spaces might be sleeping. Try again in 30 seconds.'
+        });
+      } else {
+        setReportStatus({
+          type: 'error',
+          message: `Failed to reach API: ${error.message}`
+        });
+      }
     } finally {
       setReporting(false);
     }
