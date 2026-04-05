@@ -1,6 +1,7 @@
 import numpy as np
 import pickle
 import re
+import os
 from tensorflow.keras.models import load_model
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 from nltk.corpus import stopwords
@@ -15,8 +16,30 @@ MAX_LEN = 300
 class FraudAnalyzer:
     def __init__(self):
         try:
-            self.model = load_model('bilstm_model.h5')
-            with open('tokenizer.pkl', 'rb') as f:
+            # Try multiple possible locations
+            possible_paths = [
+                '/app/bilstm_model.h5',
+                'bilstm_model.h5',
+                '/home/user/app/bilstm_model.h5'
+            ]
+            
+            model_path = None
+            for path in possible_paths:
+                logger.info(f"Checking path: {path} -> exists: {os.path.exists(path)}")
+                if os.path.exists(path):
+                    model_path = path
+                    break
+            
+            if model_path is None:
+                raise FileNotFoundError("bilstm_model.h5 not found in any expected location")
+            
+            tokenizer_path = model_path.replace('bilstm_model.h5', 'tokenizer.pkl')
+            
+            logger.info(f"Loading model from: {model_path}")
+            logger.info(f"Loading tokenizer from: {tokenizer_path}")
+            
+            self.model = load_model(model_path)
+            with open(tokenizer_path, 'rb') as f:
                 self.tokenizer = pickle.load(f)
             self.stop_words = set(stopwords.words('english'))
             logger.info("✅ BiLSTM model and tokenizer loaded successfully")
@@ -62,7 +85,7 @@ class FraudAnalyzer:
         # Generate red flags based on keywords
         red_flags = []
         text_lower = combined.lower()
-        
+
         flag_keywords = {
             "wire transfer": "Requests wire transfer",
             "bitcoin": "Requests cryptocurrency payment",
