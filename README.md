@@ -1,6 +1,6 @@
 # The Sentinel - AI Job Fraud Detection & Reporting System
 
-🚨 **Live Demo**: [https://sentinel-demo.vercel.app](https://sentinel-demo.vercel.app)  
+🚨 **Live Demo**: [https://fake-jobdetection-frontend124.vercel.app](https://fake-jobdetection-frontend124.vercel.app)  
 🔧 **Backend API**: [https://sentinel-api.hf.space](https://sentinel-api.hf.space)
 
 ## Overview
