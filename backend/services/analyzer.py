@@ -1,34 +1,96 @@
 import numpy as np
+import pickle
+import re
+from tensorflow.keras.models import load_model
+from tensorflow.keras.preprocessing.sequence import pad_sequences
+from nltk.corpus import stopwords
+import nltk
+import logging
 
-# Mockup for Sentinel's NLP Preprocessing & BiLSTM Inference
+nltk.download('stopwords')
+logger = logging.getLogger(__name__)
+
+MAX_LEN = 300
 
 class FraudAnalyzer:
-    def __init__(self, model_path=None):
-        # Mock model - not using TensorFlow for demo
-        self.model = None
-    
+    def __init__(self):
+        try:
+            self.model = load_model('bilstm_model.h5')
+            with open('tokenizer.pkl', 'rb') as f:
+                self.tokenizer = pickle.load(f)
+            self.stop_words = set(stopwords.words('english'))
+            logger.info("✅ BiLSTM model and tokenizer loaded successfully")
+        except Exception as e:
+            logger.error(f"❌ Failed to load model: {e}")
+            self.model = None
+            self.tokenizer = None
+
+    def clean_text(self, text):
+        if not text:
+            return ""
+        text = str(text).lower()
+        text = re.sub(r'http\S+|www\S+', '', text)
+        text = re.sub(r'[^a-zA-Z\s]', '', text)
+        text = ' '.join([w for w in text.split() if w not in self.stop_words])
+        return text.strip()
+
     def analyze_posting(self, description: str, requirements: str, benefits: str, has_logo: bool, telecommuting: bool):
-        # 1. Mock Preprocessing text (Tokenization -> Padding)
-        # 2. Mock Inference
+        if self.model is None:
+            return {
+                "is_fraud": False,
+                "risk_score": 0.0,
+                "red_flags": ["Model not loaded"],
+                "feature_importance": {}
+            }
+
+        # Clean and combine text
+        combined = (
+            self.clean_text(description) + ' ' +
+            self.clean_text(requirements) + ' ' +
+            self.clean_text(benefits)
+        )
+
+        # Tokenize and pad
+        sequence = self.tokenizer.texts_to_sequences([combined])
+        padded = pad_sequences(sequence, maxlen=MAX_LEN, truncating='post', padding='post')
+
+        # Predict
+        score = float(self.model.predict(padded, verbose=0)[0][0])
+        risk_score = round(score * 100, 2)
+        is_fraud = score > 0.5
+
+        # Generate red flags based on keywords
+        red_flags = []
+        text_lower = combined.lower()
         
-        # For demonstration, generate a mock score
-        risk_score = np.random.uniform(0, 100)
-        is_fraud = risk_score > 75.0
-        
-        flags = []
-        if risk_score > 50:
-            flags.append("Vague Salary")
-        if risk_score > 80:
-            flags.append("Request for bank details")
-            
-        return {
-            "is_fraud": bool(is_fraud),
-            "risk_score": round(float(risk_score), 2),
-            "red_flags": flags,
-            "feature_importance": {"description_weight": 0.6, "no_logo_weight": 0.4}
+        flag_keywords = {
+            "wire transfer": "Requests wire transfer",
+            "bitcoin": "Requests cryptocurrency payment",
+            "western union": "Requests Western Union payment",
+            "urgent": "Creates false urgency",
+            "guaranteed": "Makes unrealistic guarantees",
+            "no experience": "Suspiciously low requirements",
+            "upfront": "Requests upfront payment",
+            "gift card": "Requests gift card payment",
+            "money order": "Requests money order",
+            "work from home": "Unverified remote work claim",
         }
 
-analyzer = FraudAnalyzer()
+        for keyword, flag in flag_keywords.items():
+            if keyword in text_lower:
+                red_flags.append(flag)
 
+        if not has_logo:
+            red_flags.append("No company logo")
+
+        if is_fraud and not red_flags:
+            red_flags.append("Suspicious language patterns detected by BiLSTM")
+
+        return {
+            "is_fraud": bool(is_fraud),
+            "risk_score": risk_score,
+            "red_flags": red_flags,
+            "feature_importance": {"bilstm_confidence": score, "text_weight": 0.8, "metadata_weight": 0.2}
+        }
 
 analyzer = FraudAnalyzer()
