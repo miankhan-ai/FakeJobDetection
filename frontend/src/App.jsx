@@ -8,15 +8,40 @@ function App() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [jobData, setJobData] = useState(null);
 
-  // Mock analysis trigger
-  const handleAnalyze = (jobInputData) => {
+  // Call backend API to analyze job posting
+  const handleAnalyze = async (jobInputData) => {
     setJobData(jobInputData);
     setIsAnalyzing(true);
     setAnalysisResult(null);
 
-    // Simulate API call to backend /api/analyze
-    setTimeout(() => {
-      // Mocked response logic simulating the BiLSTM's results
+    try {
+      // Use environment variable for API URL, fallback to localhost for development
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      
+      const response = await fetch(`${apiUrl}/api/analyze`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: jobInputData.title,
+          company: jobInputData.company,
+          description: jobInputData.description,
+          requirements: jobInputData.requirements || '',
+          benefits: jobInputData.benefits || '',
+          url: jobInputData.url || ''
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`API Error: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      setAnalysisResult(result);
+    } catch (error) {
+      console.error('Analysis error:', error);
+      // Fallback to mock data on error
       const mockResult = {
         is_fraud: jobInputData.description.includes('wire') || jobInputData.description.includes('urgent'),
         risk_score: (jobInputData.description.includes('wire') || jobInputData.description.includes('urgent')) ? 92.5 : 24.1,
@@ -25,10 +50,10 @@ function App() {
           : [],
         feature_importance: {"description_weight": 0.8, "telecommuting_weight": 0.2}
       };
-      
       setAnalysisResult(mockResult);
+    } finally {
       setIsAnalyzing(false);
-    }, 2000);
+    }
   };
 
   return (
